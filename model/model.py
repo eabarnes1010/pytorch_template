@@ -1,8 +1,38 @@
 import torch
 from base.base_model import BaseModel
+import matplotlib.pyplot as plt
 
 
-class RescaleLayer():
+# https://github.com/FrancescoSaverioZuppichini/Pytorch-how-and-when-to-use-Module-Sequential-ModuleList-and-ModuleDict
+
+
+def conv_block(in_channels, out_channels, *args, **kwargs):
+    return torch.nn.Sequential(
+        torch.nn.Conv2d(in_channels, out_channels, *args, **kwargs),
+        torch.nn.ReLU(),
+        torch.nn.MaxPool2d(kernel_size=(2, 2), ceil_mode=True),
+    )
+
+
+def dense_block(out_features, *args, **kwargs):
+    return torch.nn.Sequential(
+        torch.nn.LazyLinear(out_features=out_features, bias=True),
+        torch.nn.ReLU(),
+        torch.nn.Linear(in_features=out_features, out_features=out_features, bias=True),
+        torch.nn.ReLU(),
+        torch.nn.Linear(in_features=out_features, out_features=out_features, bias=True),
+        torch.nn.ReLU(),
+    )
+
+
+def dense_lazy_block(out_features, *args, **kwargs):
+    return torch.nn.Sequential(
+        torch.nn.LazyLinear(out_features=out_features, bias=True),
+        torch.nn.ReLU(),
+    )
+
+
+class RescaleLayer:
     def __init__(self, scale, offset):
         self.offset = offset
         self.scale = scale
@@ -18,37 +48,37 @@ class TorchModel(BaseModel):
         super().__init__()
 
         if target is None:
-            self.target_mean = 0.0
-            self.target_std = 1.0
+            self.target_mean = torch.tensor(0.0)
+            self.target_std = torch.tensor(1.0)
         else:
-            self.target_mean = torch.tensor(target.mean(axis=0), dtype=torch.float32)
-            self.target_std = torch.tensor(target.std(axis=0), dtype=torch.float32)
+            self.target_mean = torch.tensor(target.mean(axis=0))
+            self.target_std = torch.tensor(target.std(axis=0))
 
-        self.conv5 = torch.nn.Sequential(
-            torch.nn.Conv2d(in_channels=1, out_channels=32, kernel_size=5),
-            torch.nn.ReLU(),
-            torch.nn.MaxPool2d(kernel_size=2, stride=2),
-        )
-        self.conv3 = torch.nn.Sequential(
-            torch.nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3),
-            torch.nn.ReLU(),
-            torch.nn.MaxPool2d(kernel_size=2, stride=2),
+        self.pad_lons = torch.nn.CircularPad2d((5, 5, 0, 0))
+
+        self.cnn_block = torch.nn.Sequential(
+            conv_block(in_channels=1, out_channels=32, kernel_size=5, padding="same"),
+            conv_block(in_channels=32, out_channels=32, kernel_size=3, padding="same"),
+            conv_block(in_channels=32, out_channels=32, kernel_size=3, padding="same"),
+            torch.nn.Flatten(start_dim=1),
         )
 
-        self.flat = torch.nn.Flatten(start_dim=1)
+        self.finaldense_mu = dense_lazy_block(out_features=10)
+        self.finaldense_sigma = dense_lazy_block(out_features=10)
+        self.finaldense_gamma = dense_lazy_block(out_features=10)
+        self.finaldense_tau = dense_lazy_block(out_features=10)
 
-        self.fc1_lzx10 = torch.nn.Sequential(
-            torch.nn.LazyLinear(out_features=10, bias=True),
-            torch.nn.ReLU(),
+        self.denseblock_mu = dense_block(
+            out_features=10,
         )
-
-        self.dense_block = torch.nn.Sequential(
-            torch.nn.LazyLinear(out_features=10, bias=True),
-            torch.nn.ReLU(),
-            torch.nn.Linear(in_features=10, out_features=10, bias=True),
-            torch.nn.ReLU(),
-            torch.nn.Linear(in_features=10, out_features=10, bias=True),
-            torch.nn.ReLU(),
+        self.denseblock_sigma = dense_block(
+            out_features=10,
+        )
+        self.denseblock_gamma = dense_block(
+            out_features=10,
+        )
+        self.denseblock_tau = dense_block(
+            out_features=10,
         )
 
         self.rescale_mu = RescaleLayer(self.target_std, self.target_mean)
@@ -62,35 +92,36 @@ class TorchModel(BaseModel):
 
     def forward(self, x, x_unit):
 
-        x = self.conv5(x)
-        x = self.conv3(x)
-        x = self.conv3(x)
-
-        x = self.flat(x)
+        x = self.pad_lons(x)
+        x = self.cnn_block(x)
 
         # build mu_layers
         x_mu = torch.cat((x, x_unit[:, None]), dim=-1)
-        x_mu = self.dense_block(x_mu)
+        x_mu = self.denseblock_mu(x_mu)
         x_mu = torch.cat((x_mu, x_unit[:, None]), dim=-1)
-        x_mu = self.fc1_lzx10(x_mu)
+        x_mu = self.finaldense_mu(x_mu)
         mu_out = self.output_mu(x_mu)
 
         # build sigma_layers
         x_sigma = torch.cat((x, x_unit[:, None]), dim=-1)
-        x_sigma = self.dense_block(x_sigma)
+        x_sigma = self.denseblock_sigma(x_sigma)
         x_sigma = torch.cat((x_sigma, x_unit[:, None]), dim=-1)
-        x_sigma = self.fc1_lzx10(x_sigma)
+        x_sigma = self.finaldense_sigma(x_sigma)
         sigma_out = self.output_sigma(x_sigma)
 
         # build gamma_layers
         x_gamma = torch.cat((x, x_unit[:, None]), dim=-1)
-        x_gamma = self.dense_block(x_gamma)
+        x_gamma = self.denseblock_gamma(x_gamma)
         x_gamma = torch.cat((x_gamma, x_unit[:, None]), dim=-1)
-        x_gamma = self.fc1_lzx10(x_gamma)
+        x_gamma = self.finaldense_gamma(x_gamma)
         gamma_out = self.output_gamma(x_gamma)
 
         # build tau_layers
-        tau_out = self.output_tau(x_gamma)
+        x_tau = torch.cat((x, x_unit[:, None]), dim=-1)
+        x_tau = self.denseblock_tau(x_tau)
+        x_tau = torch.cat((x_tau, x_unit[:, None]), dim=-1)
+        x_tau = self.finaldense_tau(x_tau)
+        tau_out = self.output_tau(x_tau)
 
         # rescaling layers
         mu_out = self.rescale_mu(mu_out)
