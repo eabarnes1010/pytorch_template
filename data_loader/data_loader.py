@@ -21,13 +21,13 @@ class CustomData(torch.utils.data.Dataset):
         with open(data_file, "rb") as handle:
             dict_data = pickle.load(handle)
 
-        # self.input = np.moveaxis(dict_data["x"], -1, 1)
-        # self.input_unit = dict_data["emissions_left"]
-        # self.target = dict_data["y"]
+        self.input = np.moveaxis(dict_data["x"], -1, 1)
+        self.input_unit = dict_data["emissions_left"]
+        self.target = dict_data["y"]
 
-        self.input = np.moveaxis(dict_data["x"], -1, 1)[:100]
-        self.input_unit = dict_data["emissions_left"][:100]
-        self.target = dict_data["y"][:100]
+        # self.input = np.moveaxis(dict_data["x"], -1, 1)[:100]
+        # self.input_unit = dict_data["emissions_left"][:100]
+        # self.target = dict_data["y"][:100]
 
     def __len__(self):
         return len(self.target)

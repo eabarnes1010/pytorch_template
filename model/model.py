@@ -2,9 +2,10 @@
 
 Functions
 ---------
-conv_block(in_channels, out_channels, *args, **kwargs)
-dense_block(out_features, *args, **kwargs)
-dense_lazy_block(out_features, *args, **kwargs)
+conv_couplet(in_channels, out_channels, act_fun, *args, **kwargs)
+dense_lazy_couplet(out_features, act_fun, *args, **kwargs)
+conv_block(in_channels, out_channels, act_fun, kernel_size)
+dense_block(out_features, act_fun)
 
 
 Classes
@@ -22,30 +23,40 @@ import matplotlib.pyplot as plt
 # https://github.com/FrancescoSaverioZuppichini/Pytorch-how-and-when-to-use-Module-Sequential-ModuleList-and-ModuleDict
 
 
-def conv_block(in_channels, out_channels, *args, **kwargs):
+def conv_couplet(in_channels, out_channels, act_fun, *args, **kwargs):
     return torch.nn.Sequential(
         torch.nn.Conv2d(in_channels, out_channels, *args, **kwargs),
-        torch.nn.ReLU(),
+        getattr(torch.nn, act_fun)(),
         torch.nn.MaxPool2d(kernel_size=(2, 2), ceil_mode=True),
     )
 
 
-def dense_block(out_features, *args, **kwargs):
+def dense_lazy_couplet(out_features, act_fun, *args, **kwargs):
     return torch.nn.Sequential(
         torch.nn.LazyLinear(out_features=out_features, bias=True),
-        torch.nn.ReLU(),
-        torch.nn.Linear(in_features=out_features, out_features=out_features, bias=True),
-        torch.nn.ReLU(),
-        torch.nn.Linear(in_features=out_features, out_features=out_features, bias=True),
-        torch.nn.ReLU(),
+        getattr(torch.nn, act_fun)(),
     )
 
 
-def dense_lazy_block(out_features, *args, **kwargs):
-    return torch.nn.Sequential(
-        torch.nn.LazyLinear(out_features=out_features, bias=True),
-        torch.nn.ReLU(),
-    )
+def conv_block(in_channels, out_channels, act_fun, kernel_size):
+    block = [
+        conv_couplet(in_channels, out_channels, act_fun, kernel_size, padding="same")
+        for in_channels, out_channels, act_fun, kernel_size in zip(
+            [*in_channels],
+            [*out_channels],
+            [*act_fun],
+            [*kernel_size],
+        )
+    ]
+    return torch.nn.Sequential(*block)
+
+
+def dense_block(out_features, act_fun):
+    block = [
+        dense_lazy_couplet(out_channels, act_fun)
+        for out_channels, act_fun in zip([*out_features], [*act_fun])
+    ]
+    return torch.nn.Sequential(*block)
 
 
 class RescaleLayer:
@@ -60,8 +71,13 @@ class RescaleLayer:
 
 
 class TorchModel(BaseModel):
-    def __init__(self, target=None):
+    def __init__(self, config, target=None):
         super().__init__()
+
+        self.config = config
+
+        assert len(self.config["cnn_act"]) == len(self.config["kernel_size"]) == len(self.config["filters"])
+        assert len(self.config["hiddens_block"]) == len(self.config["hiddens_block_act"])
 
         if target is None:
             self.target_mean = torch.tensor(0.0)
@@ -70,46 +86,72 @@ class TorchModel(BaseModel):
             self.target_mean = torch.tensor(target.mean(axis=0))
             self.target_std = torch.tensor(target.std(axis=0))
 
-        self.pad_lons = torch.nn.CircularPad2d((5, 5, 0, 0))
+        # Longitude padding
+        self.pad_lons = torch.nn.CircularPad2d(config["circular_padding"])
 
-        self.cnn_block = torch.nn.Sequential(
-            conv_block(in_channels=1, out_channels=32, kernel_size=5, padding="same"),
-            conv_block(in_channels=32, out_channels=32, kernel_size=3, padding="same"),
-            conv_block(in_channels=32, out_channels=32, kernel_size=3, padding="same"),
-            torch.nn.Flatten(start_dim=1),
+        # CNN block
+        self.cnn_block = conv_block(
+            [1, *config["filters"][:-1]],
+            [*config["filters"]],
+            [*config["cnn_act"]],
+            [*config["kernel_size"]],
         )
 
-        self.finaldense_mu = dense_lazy_block(out_features=10)
-        self.finaldense_sigma = dense_lazy_block(out_features=10)
-        self.finaldense_gamma = dense_lazy_block(out_features=10)
-        self.finaldense_tau = dense_lazy_block(out_features=10)
+        # Flat layer
+        self.flat = torch.nn.Flatten(start_dim=1)
 
+        # Dense blocks
         self.denseblock_mu = dense_block(
-            out_features=10,
+            config["hiddens_block"], config["hiddens_block_act"]
         )
         self.denseblock_sigma = dense_block(
-            out_features=10,
+            config["hiddens_block"], config["hiddens_block_act"]
         )
         self.denseblock_gamma = dense_block(
-            out_features=10,
+            config["hiddens_block"], config["hiddens_block_act"]
         )
         self.denseblock_tau = dense_block(
-            out_features=10,
+            config["hiddens_block"], config["hiddens_block_act"]
         )
 
+        # Final dense layer
+        self.finaldense_mu = dense_lazy_couplet(
+            out_features=config["hiddens_final"], act_fun=config["hiddens_final_act"]
+        )
+        self.finaldense_sigma = dense_lazy_couplet(
+            out_features=config["hiddens_final"], act_fun=config["hiddens_final_act"]
+        )
+        self.finaldense_gamma = dense_lazy_couplet(
+            out_features=config["hiddens_final"], act_fun=config["hiddens_final_act"]
+        )
+        self.finaldense_tau = dense_lazy_couplet(
+            out_features=config["hiddens_final"], act_fun=config["hiddens_final_act"]
+        )
+
+        # Rescaling layers
         self.rescale_mu = RescaleLayer(self.target_std, self.target_mean)
         self.rescale_sigma = RescaleLayer(torch.tensor(1.0), torch.log(self.target_std))
         self.rescale_tau = RescaleLayer(torch.tensor(0.0), torch.tensor(1.0))
 
-        self.output_mu = torch.nn.Linear(in_features=10, out_features=1, bias=True)
-        self.output_sigma = torch.nn.Linear(in_features=10, out_features=1, bias=True)
-        self.output_gamma = torch.nn.Linear(in_features=10, out_features=1, bias=True)
-        self.output_tau = torch.nn.Linear(in_features=10, out_features=1, bias=True)
+        # Output layers
+        self.output_mu = torch.nn.Linear(
+            in_features=config["hiddens_final"], out_features=1, bias=True
+        )
+        self.output_sigma = torch.nn.Linear(
+            in_features=config["hiddens_final"], out_features=1, bias=True
+        )
+        self.output_gamma = torch.nn.Linear(
+            in_features=config["hiddens_final"], out_features=1, bias=True
+        )
+        self.output_tau = torch.nn.Linear(
+            in_features=config["hiddens_final"], out_features=1, bias=True
+        )
 
     def forward(self, x, x_unit):
 
         x = self.pad_lons(x)
         x = self.cnn_block(x)
+        x = self.flat(x)
 
         # build mu_layers
         x_mu = torch.cat((x, x_unit[:, None]), dim=-1)

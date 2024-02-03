@@ -11,7 +11,14 @@
 
     "arch": {
         "type": "cnn",
-        "args": {}
+        "circular_padding": [5, 5, 0, 0],
+        "filters": [32, 32, 32],
+        "kernel_size": [5, 3, 3],
+        "cnn_act": ["ReLU", "ReLU", "ReLU"],
+        "hiddens_block": [10, 10, 10],
+        "hiddens_block_act": ["ReLU", "ReLU", "ReLU"],
+        "hiddens_final": 10,
+        "hiddens_final_act": "Tanh"
     },
 
     "optimizer": {
