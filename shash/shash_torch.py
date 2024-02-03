@@ -1,10 +1,18 @@
+"""Shash module for pytorch.
+
+Classes
+---------
+Shash()
+
+"""
+
+__author__ = "Randal J. Barnes and Elizabeth A. Barnes"
+__date__ = "03 February 2024"
+
 import torch
 import numpy as np
 import scipy
 import scipy.stats
-
-__author__ = "Randal J. Barnes and Elizabeth A. Barnes"
-__date__ = "02 February 2024"
 
 
 SQRT_TWO = 1.4142135623730950488016887
@@ -426,3 +434,43 @@ class Shash():
             ) / 2
 
         return torch.square(self.sigma) * (evX2 - torch.square(evX))
+
+    def skewness(self):
+        """The distribution skewness. Named as such to not overwrite the "skewness" parameter.
+
+        Returns
+        -------
+        x : Tensor of same dtype and shape as loc specified at initialization.
+            The computed distribution skewness values.
+
+        Notes
+        -----
+        * The E(X), E(X^2), and E(X^3) are computed using the moment equations
+        given on page 764 of [1].
+
+        """
+
+        print("WARNING: shash_torch.skewness needs to be checked.")
+
+        evX = torch.sinh(self.gamma / self.tau) * self._jones_pewsey_P(1.0 / self.tau)
+        evX2 = (
+            torch.cosh(2.0 * self.gamma / self.tau) * self._jones_pewsey_P(2.0 / self.tau)
+            - 1.0
+        ) / 2.0
+        evX3 = (
+            torch.sinh(3.0 * self.gamma / self.tau) * self._jones_pewsey_P(3.0 / self.tau)
+            - 3.0 * torch.sinh(self.gamma / self.tau) * self._jones_pewsey_P(1.0 / self.tau)
+        ) / 4.0
+
+        evY3 = (
+            torch.pow(self.mu, 3)
+            + 3.0 * torch.square(self.mu) * self.sigma * evX
+            + 3.0 * self.mu * torch.square(self.sigma) * evX2
+            + torch.pow(self.sigma, 3) * evX3
+        )
+        a_term = self.mu + self.sigma * evX
+        b_term = self.sigma * torch.sqrt(evX2 - evX * evX)
+
+        return (
+            evY3 - 3.0 * a_term * torch.square(b_term) - torch.pow(a_term, 3)
+        ) / torch.pow(b_term, 3)

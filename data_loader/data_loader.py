@@ -1,12 +1,18 @@
+"""Data loader modules.
+
+Classes
+---------
+CustomData(torch.utils.data.Dataset)
+
+"""
+
 from torch.utils.data import Dataset
 import torch
 import numpy as np
-
-# from base.base_data_loader import BaseDataset
 import pickle
 
 
-class CustomData(Dataset):
+class CustomData(torch.utils.data.Dataset):
     """
     Custom dataset for data in dictionaries.
     """
@@ -18,6 +24,10 @@ class CustomData(Dataset):
         self.input = np.moveaxis(dict_data["x"], -1, 1)
         self.input_unit = dict_data["emissions_left"]
         self.target = dict_data["y"]
+
+        # self.input = np.moveaxis(dict_data["x"], -1, 1)[:100]
+        # self.input_unit = dict_data["emissions_left"][:100]
+        # self.target = dict_data["y"][:100]
 
     def __len__(self):
         return len(self.target)

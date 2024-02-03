@@ -1,3 +1,12 @@
+"""Losses for training.
+
+Classes
+---------
+ShashNLL(torch.nn.Module)
+GaussianNLL(torch.nn.Module)
+
+"""
+
 import torch
 import pandas as pd
 import numpy as np
@@ -23,6 +32,8 @@ class ShashNLL(torch.nn.Module):
 
         dist = Shash(mu, sigma, gamma, tau)
         loss = -dist.log_prob(target)
+
+        # to prevent huge initial losses and improve stability
         # loss = -torch.log(dist.prob(target + self.epsilon))
 
         return loss.mean(dim=-1)
@@ -44,7 +55,7 @@ class GaussianNLL(torch.nn.Module):
 
         loss = -torch.distributions.normal.Normal(loc=loc, scale=scale).log_prob(target)
 
-        # to prevent HUGE initial losses and improve stability
+        # to prevent huge initial losses and improve stability
         # loss = -torch.log(
         #     torch.exp(torch.distributions.normal.Normal(loc=loc, scale=scale).log_prob(target))
         #     + self.epsilon

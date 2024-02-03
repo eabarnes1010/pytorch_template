@@ -1,6 +1,15 @@
+"""Trainer modules for pytorch models.
+
+Classes
+---------
+Trainer(base.base_trainer.BaseTrainer)
+
+"""
+
 import numpy as np
 import torch
 from base.base_trainer import BaseTrainer
+from utils import MetricTracker
 
 
 class Trainer(BaseTrainer):
@@ -12,6 +21,7 @@ class Trainer(BaseTrainer):
         self,
         model,
         criterion,
+        metric_funcs,
         optimizer,
         max_epochs,
         device,
@@ -22,6 +32,7 @@ class Trainer(BaseTrainer):
         super().__init__(
             model,
             criterion,
+            metric_funcs,
             optimizer,
             max_epochs,
             device,
@@ -32,6 +43,8 @@ class Trainer(BaseTrainer):
         self.data_loader = data_loader
         self.validation_data_loader = validation_data_loader
 
+        self.do_validation = True
+
     def _train_epoch(self, epoch):
         """
         Training logic for an epoch
@@ -41,7 +54,7 @@ class Trainer(BaseTrainer):
         """
 
         self.model.train()
-        running_loss = 0.0
+        self.batch_log.reset()
 
         for batch_idx, (data, target) in enumerate(self.data_loader):
             input, input_unit, target = (
@@ -49,10 +62,6 @@ class Trainer(BaseTrainer):
                 data[1].to(self.device),
                 target.to(self.device),
             )
-            # input, target = (
-            #     data.to(self.device),
-            #     target.to(self.device),
-            # )
 
             # Zero your gradients for every batch!
             self.optimizer.zero_grad()
@@ -68,11 +77,15 @@ class Trainer(BaseTrainer):
             # Adjust learning weights
             self.optimizer.step()
 
-            # Gather data and report
-            running_loss += loss.item()
+            # Log the results
+            self.batch_log.update("batch", batch_idx)
+            self.batch_log.update("loss", loss.item())
+            for met in self.metric_funcs:
+                self.batch_log.update(met.__name__, met(output, target))
 
-        # return running_loss / len(self.trainloader.sampler)
-        return running_loss / self.data_loader.__len__()
+        # Run validation
+        if self.do_validation:
+            self._validation_epoch(epoch)
 
     def _validation_epoch(self, epoch):
         """
@@ -83,10 +96,8 @@ class Trainer(BaseTrainer):
         """
         self.model.eval()
         with torch.no_grad():
-            running_loss = 0.0
 
             for batch_idx, (data, target) in enumerate(self.validation_data_loader):
-                # input, target = data.to(self.device), target.to(self.device)
                 input, input_unit, target = (
                     data[0].to(self.device),
                     data[1].to(self.device),
@@ -96,6 +107,7 @@ class Trainer(BaseTrainer):
                 output = self.model(input, input_unit)
                 loss = self.criterion(output, target)
 
-                running_loss += loss.item()
-
-        return running_loss / self.validation_data_loader.__len__()
+                # Log the results
+                self.batch_log.update("val_loss", loss.item())
+                for met in self.metric_funcs:
+                    self.batch_log.update("val_" + met.__name__, met(output, target))

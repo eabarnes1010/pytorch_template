@@ -1,3 +1,19 @@
+"""Network modules for pytorch models.
+
+Functions
+---------
+conv_block(in_channels, out_channels, *args, **kwargs)
+dense_block(out_features, *args, **kwargs)
+dense_lazy_block(out_features, *args, **kwargs)
+
+
+Classes
+---------
+RescaleLayer()
+TorchModel(base.base_model.BaseModel)
+
+"""
+
 import torch
 from base.base_model import BaseModel
 import matplotlib.pyplot as plt

@@ -1,8 +1,19 @@
+"""Base trainer modules for pytorch models.
+
+Classes
+---------
+BaseTrainer()
+EarlyStopping()
+
+"""
+
 import torch
 from abc import abstractmethod
 from numpy import inf
 import time
 import copy
+import numpy as np
+from utils import MetricTracker
 
 
 class BaseTrainer:
@@ -11,17 +22,40 @@ class BaseTrainer:
     """
 
     def __init__(
-        self, model, criterion, optimizer, max_epochs, device, patience, min_delta
+        self,
+        model,
+        criterion,
+        metric_funcs,
+        optimizer,
+        max_epochs,
+        device,
+        patience,
+        min_delta,
     ):
+        self.device = device
+
         self.model = model
         self.criterion = criterion
         self.optimizer = optimizer
 
-        self.device = device
-
         self.max_epochs = max_epochs
-
         self.early_stopper = EarlyStopping(patience=patience, min_delta=min_delta)
+
+        self.metric_funcs = metric_funcs
+        self.batch_log = MetricTracker(
+            "batch",
+            "loss",
+            "val_loss",
+            *[m.__name__ for m in self.metric_funcs],
+            *["val_" + m.__name__ for m in self.metric_funcs],
+        )
+        self.log = MetricTracker(
+            "epoch",
+            "loss",
+            "val_loss",
+            *[m.__name__ for m in self.metric_funcs],
+            *["val_" + m.__name__ for m in self.metric_funcs],
+        )
 
     def fit(self):
         """
@@ -29,25 +63,39 @@ class BaseTrainer:
         """
 
         for epoch in range(self.max_epochs + 1):
+
             start_time = time.time()
 
-            train_result = self._train_epoch(epoch)
-            val_result = self._validation_epoch(epoch)
+            self._train_epoch(epoch)
+
+            # log the results of the epoch
+            self.batch_log.result()
+            self.log.update("epoch", epoch)
+            for key in self.batch_log.history:
+                self.log.update(key, self.batch_log.history[key])
 
             # early stopping
-            if self.early_stopper.check_early_stop(epoch, val_result, self.model):
+            if self.early_stopper.check_early_stop(
+                epoch, self.log.history["val_loss"][epoch], self.model
+            ):
                 print(
                     f"Restoring model weights from the end of the best epoch {self.early_stopper.best_epoch}: val_loss = {self.early_stopper.min_validation_loss:.5f}"
                 )
                 self.model.load_state_dict(self.early_stopper.best_model_state)
                 break
 
+            # Print out progress during training
             end_time = time.time()
             elapsed_time = end_time - start_time
             print(
                 f"Epoch {epoch:3d}/{self.max_epochs:2d}\n"
-                f"  {elapsed_time:.1f}s - train_loss: {train_result:.5f} - val_loss: {val_result:.5f}"
+                f"  {elapsed_time:.1f}s"
+                f" - train_loss: {self.log.history['loss'][epoch]:.5f}"
+                f" - val_loss: {self.log.history['val_loss'][epoch]:.5f}"
             )
+
+        # reset the batch_log
+        self.batch_log.reset()
 
     @abstractmethod
     def _train_epoch(self):
