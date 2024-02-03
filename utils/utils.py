@@ -5,7 +5,7 @@ Functions
 prepare_device(device="gpu")
 save_torch_model(model, filename)
 load_torch_model(model, filename)
-
+get_config(exp_name)
 
 Classes
 ---------
@@ -45,6 +45,14 @@ def load_torch_model(model, filename):
     model.load_state_dict(torch.load(filename))
     model.eval()
     return model
+
+
+def get_config(exp_name):
+    with open("config/config_" + exp_name[4:] + ".json") as f:
+        config = json.load(f)
+    assert config["exp_name"] == "exp_" + exp_name[4:]
+
+    return config
 
 
 class MetricTracker:

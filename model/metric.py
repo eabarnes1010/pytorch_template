@@ -20,14 +20,10 @@ def custom_mae(output, target):
 
     """
     with torch.no_grad():
-        mu = output[:, 0]
-        sigma = output[:, 1]
-        gamma = output[:, 2]
-        tau = output[:, 3]
 
-        assert len(mu) == len(target)
+        assert len(output[:, 0]) == len(target)
 
-        dist = Shash(mu, sigma, gamma, tau)
+        dist = Shash(output)
         return torch.mean(torch.abs(dist.median() - target)).item()
 
 
@@ -39,7 +35,7 @@ def iqr_capture(output, target):
     with torch.no_grad():
         assert len(output[:, 0]) == len(target)
 
-        dist = Shash(output[:, 0], output[:, 1], output[:, 2], output[:, 3])
+        dist = Shash(output)
         lower = dist.quantile(torch.tensor(0.25))
         upper = dist.quantile(torch.tensor(0.75))
         count = torch.sum(
@@ -54,7 +50,7 @@ def sign_test(output, target):
     with torch.no_grad():
         assert len(output[:, 0]) == len(target)
 
-        dist = Shash(output[:, 0], output[:, 1], output[:, 2], output[:, 3])
+        dist = Shash(output)
         median = dist.quantile(torch.tensor(0.50))
         count = torch.sum(torch.greater(target, median)).item()
 
@@ -65,7 +61,7 @@ def pit(output, target):
     """Compute the PIT (Probability Integral Transform) histogram."""
     bins = np.linspace(0, 1, 11)
 
-    dist = Shash(output[:, 0], output[:, 1], output[:, 2], output[:, 3])
+    dist = Shash(output)
     F = dist.cdf(target)
     pit_hist = np.histogram(
         F,

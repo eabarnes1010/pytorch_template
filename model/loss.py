@@ -25,12 +25,7 @@ class ShashNLL(torch.nn.Module):
 
     def forward(self, output, target):
 
-        mu = output[:, 0]
-        sigma = output[:, 1]
-        gamma = output[:, 2]
-        tau = output[:, 3]
-
-        dist = Shash(mu, sigma, gamma, tau)
+        dist = Shash(output)
         loss = -dist.log_prob(target)
 
         # to prevent huge initial losses and improve stability

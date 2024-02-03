@@ -1,6 +1,7 @@
 {
-    "name": "exp_test",
+    "exp_name": "exp_test",
     "device": "gpu",
+    "seed": 44,
 
     "data_loader": {
         "data_dir": "data/",
@@ -9,7 +10,7 @@
     },
 
     "arch": {
-        "type": "test",
+        "type": "cnn",
         "args": {}
     },
 

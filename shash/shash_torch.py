@@ -95,7 +95,7 @@ class Shash:
 
     """
 
-    def __init__(self, mu, sigma, gamma, tau):
+    def __init__(self, params):
         """
         mu : float (batch size x 1) Tensor
             The location parameter.
@@ -110,10 +110,19 @@ class Shash:
             The tail-weight parameter. Must be strictly positive. If tau is None then the default value of tau=1 is used.
         """
 
-        self.mu = mu
-        self.sigma = sigma
-        self.gamma = gamma
-        self.tau = tau
+        self.mu = params[:, 0]
+        self.sigma = params[:, 1]
+        self.gamma = params[:, 2]
+        self.tau = params[:, 3]
+
+        # Only necessary during evaluation, not during training.
+        # Need to check after params has been separated, otherwise
+        # it is not differentiable.
+        if not torch.is_tensor(self.mu):
+            self.mu = torch.tensor(self.mu)
+            self.sigma = torch.tensor(self.sigma)
+            self.gamma = torch.tensor(self.gamma)
+            self.tau = torch.tensor(self.tau)
 
     def _jones_pewsey_P(self, q):
         """P_q function from page 764 of [1].
@@ -200,6 +209,13 @@ class Shash:
         notation.
 
         """
+
+        if not torch.is_tensor(x):
+            if hasattr(x, "__len__"):
+                x = torch.tensor(x[:, None])
+            else:
+                x = torch.tensor(x)
+
         y = (x - self.mu) / self.sigma
         y = torch.divide(torch.subtract(x, self.mu), self.sigma)
 
@@ -389,13 +405,13 @@ class Shash:
             The generated random variates.
 
         """
-        z = scipy.stats.norm.rvs(size=size)
+        z = torch.tensor(scipy.stats.norm.rvs(size=size))
 
         if self.tau is None:
-            return self.mu + self.sigma * np.sinh(np.arcsinh(z) + self.gamma)
+            return self.mu + self.sigma * torch.sinh(torch.arcsinh(z) + self.gamma)
         else:
-            return self.mu + self.sigma * np.sinh(
-                (np.arcsinh(z) + self.gamma) / self.tau
+            return self.mu + self.sigma * torch.sinh(
+                (torch.arcsinh(z) + self.gamma) / self.tau
             )
 
     def std(self):
@@ -464,7 +480,7 @@ class Shash:
 
         """
 
-        print("WARNING: shash_torch.skewness needs to be checked.")
+        raise Warning("This code is not correct.")
 
         evX = torch.sinh(self.gamma / self.tau) * self._jones_pewsey_P(1.0 / self.tau)
         evX2 = (
