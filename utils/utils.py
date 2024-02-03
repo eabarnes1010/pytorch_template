@@ -29,8 +29,10 @@ def prepare_device(device="gpu"):
         else:
             print("Warning: MPS device not found." "Training will be performed on CPU.")
             device = torch.device("cpu")
-    else:
+    elif device == "cpu":
         device = torch.device("cpu")
+    else:
+        raise NotImplementedError
 
     return device
 

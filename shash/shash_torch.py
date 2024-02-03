@@ -22,7 +22,7 @@ SQRT_TWO_PI = 2.5066282746310005024157653
 ONE_OVER_SQRT_TWO_PI = 0.3989422804014326779399461
 
 
-class Shash():
+class Shash:
     """sinh-arcsinh normal distribution w/o using tensorflow_probability or torch.
 
     Functions
@@ -115,7 +115,7 @@ class Shash():
         self.gamma = gamma
         self.tau = tau
 
-    def _jones_pewsey_P(q):
+    def _jones_pewsey_P(self, q):
         """P_q function from page 764 of [1].
 
         Arguments
@@ -155,6 +155,10 @@ class Shash():
         # range 0 <= q <= 10.  Over this range, the max |error|/true < 0.0025.
         # These coefficients were computed by minimizing the maximum relative
         # error, and not by a simple least squares regression.
+
+        # return torch.exp(tf.math.polyval(coeffs, q))
+        # return torch.exp(q ** np.arange(len(coeffs) - 1, -1, -1) * coeffs)
+
         coeffs = [
             9.37541380598926e-06,
             -0.000377732651131894,
@@ -164,8 +168,17 @@ class Shash():
             -0.0337884356755193,
             0.00248824801827172,
         ]
-        # return torch.exp(tf.math.polyval(coeffs, q))
-        return torch.exp(q ** np.arange(coeffs.size(0) - 1, -1, -1) * coeffs)
+
+        val = (
+            coeffs[0] * q**6
+            + coeffs[1] * q**5
+            + coeffs[2] * q**4
+            + coeffs[3] * q**3
+            + coeffs[4] * q**2
+            + coeffs[5] * q**1
+            + coeffs[6] * q**0
+        )
+        return torch.exp(val)
 
     def prob(self, x):
         """Probability density function (pdf).
@@ -188,6 +201,7 @@ class Shash():
 
         """
         y = (x - self.mu) / self.sigma
+        y = torch.divide(torch.subtract(x, self.mu), self.sigma)
 
         if self.tau is None:
             rsqr = torch.square(torch.sinh(torch.asinh(y) - self.gamma))
@@ -384,7 +398,7 @@ class Shash():
                 (np.arcsinh(z) + self.gamma) / self.tau
             )
 
-    def stddev(self):
+    def std(self):
         """The distribution standard deviation.
 
         Arguments
@@ -396,9 +410,9 @@ class Shash():
             The computed distribution standard deviation values.
 
         """
-        return torch.sqrt(self.variance())
+        return torch.sqrt(self.var())
 
-    def variance(self):
+    def var(self):
         """The distribution variance.
 
         Arguments
@@ -454,12 +468,16 @@ class Shash():
 
         evX = torch.sinh(self.gamma / self.tau) * self._jones_pewsey_P(1.0 / self.tau)
         evX2 = (
-            torch.cosh(2.0 * self.gamma / self.tau) * self._jones_pewsey_P(2.0 / self.tau)
+            torch.cosh(2.0 * self.gamma / self.tau)
+            * self._jones_pewsey_P(2.0 / self.tau)
             - 1.0
         ) / 2.0
         evX3 = (
-            torch.sinh(3.0 * self.gamma / self.tau) * self._jones_pewsey_P(3.0 / self.tau)
-            - 3.0 * torch.sinh(self.gamma / self.tau) * self._jones_pewsey_P(1.0 / self.tau)
+            torch.sinh(3.0 * self.gamma / self.tau)
+            * self._jones_pewsey_P(3.0 / self.tau)
+            - 3.0
+            * torch.sinh(self.gamma / self.tau)
+            * self._jones_pewsey_P(1.0 / self.tau)
         ) / 4.0
 
         evY3 = (

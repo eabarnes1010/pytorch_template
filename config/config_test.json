@@ -29,12 +29,12 @@
     ],
 
     "trainer": {
-        "max_epochs": 10,
+        "max_epochs": 15,
         "save_dir": "saved_models/",
         "early_stopping":{
             "args":{
                 "patience": 2,
-                "min_delta": 0.5
+                "min_delta": 0.0
             }
         }
     }
