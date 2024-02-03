@@ -48,9 +48,15 @@ def load_torch_model(model, filename):
 
 
 def get_config(exp_name):
-    with open("config/config_" + exp_name[4:] + ".json") as f:
+
+    basename = "exp_"
+
+    with open("config/config_" + exp_name[len(basename) :] + ".json") as f:
         config = json.load(f)
-    assert config["exp_name"] == "exp_" + exp_name[4:]
+
+    assert (
+        config["exp_name"] == basename + exp_name[len(basename) :]
+    ), "Exp_Name must be equal to config[exp_name]"
 
     return config
 
