@@ -28,18 +28,17 @@ class BaseTrainer:
         metric_funcs,
         optimizer,
         max_epochs,
-        device,
-        patience,
-        min_delta,
+        config
     ):
-        self.device = device
+
+        self.config = config
 
         self.model = model
         self.criterion = criterion
         self.optimizer = optimizer
 
         self.max_epochs = max_epochs
-        self.early_stopper = EarlyStopping(patience=patience, min_delta=min_delta)
+        self.early_stopper = EarlyStopping(**config["trainer"]["early_stopping"]["args"])
 
         self.metric_funcs = metric_funcs
         self.batch_log = MetricTracker(

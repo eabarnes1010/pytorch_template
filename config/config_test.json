@@ -1,0 +1,41 @@
+{
+    "name": "exp_test",
+    "device": "gpu",
+
+    "data_loader": {
+        "data_dir": "data/",
+        "batch_size": 32,
+        "args": {}
+    },
+
+    "arch": {
+        "type": "test",
+        "args": {}
+    },
+
+    "optimizer": {
+        "type": "Adam",
+        "args":{
+            "lr": 0.00001,
+            "weight_decay": 0,
+            "amsgrad": false
+        }
+    },
+
+    "criterion": "ShashNLL",
+
+    "metrics": [
+        "custom_mae", "iqr_capture", "sign_test"
+    ],
+
+    "trainer": {
+        "max_epochs": 10,
+        "save_dir": "saved_models/",
+        "early_stopping":{
+            "args":{
+                "patience": 2,
+                "min_delta": 0.5
+            }
+        }
+    }
+}

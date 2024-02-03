@@ -24,10 +24,10 @@ class Trainer(BaseTrainer):
         metric_funcs,
         optimizer,
         max_epochs,
-        device,
         data_loader,
         validation_data_loader,
-        settings,
+        device,
+        config,
     ):
         super().__init__(
             model,
@@ -35,10 +35,10 @@ class Trainer(BaseTrainer):
             metric_funcs,
             optimizer,
             max_epochs,
-            device,
-            settings["patience"],
-            settings["min_delta"],
+            config,
         )
+        self.config = config
+        self.device = device
 
         self.data_loader = data_loader
         self.validation_data_loader = validation_data_loader
