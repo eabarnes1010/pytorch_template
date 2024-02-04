@@ -1,5 +1,5 @@
 # Our stuff
-*.pickle
+# *.pickle
 *.pklz
 *.bak
 #*.pdf
@@ -21,7 +21,7 @@ saved_predictions/
 saved_metrics/
 docs/
 archive/
-data/
+# data/
 data_diagnostics/
 .vscode/
 #shapefiles/
