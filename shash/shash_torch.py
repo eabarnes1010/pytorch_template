@@ -259,6 +259,9 @@ class Shash:
         distributions.
 
         """
+        if not torch.is_tensor(x):
+            x = torch.is_tensor(x)
+
         return torch.log(self.prob(x))
 
     def cdf(self, x):
@@ -295,6 +298,9 @@ class Shash:
         tensorflow_probability normal distribution functions.
 
         """
+        if not torch.is_tensor(x):
+            x = torch.is_tensor(x)
+
         y = (x - self.mu) / self.sigma
 
         if self.tau is None:
@@ -384,6 +390,9 @@ class Shash:
             shape as pr.
 
         """
+        if not torch.is_tensor(pr):
+            pr = torch.tensor(pr)
+
         z = torch.special.ndtri(pr)
 
         if self.tau is None:
