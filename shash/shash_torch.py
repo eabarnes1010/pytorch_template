@@ -165,29 +165,31 @@ class Shash:
         # These coefficients were computed by minimizing the maximum relative
         # error, and not by a simple least squares regression.
 
-        # return torch.exp(tf.math.polyval(coeffs, q))
-        # return torch.exp(q ** np.arange(len(coeffs) - 1, -1, -1) * coeffs)
+        # coeffs = [
+        #     9.37541380598926e-06,
+        #     -0.000377732651131894,
+        #     0.00642826706073389,
+        #     -0.061281078712518,
+        #     0.390956214318641,
+        #     -0.0337884356755193,
+        #     0.00248824801827172,
+        # ]
 
-        coeffs = [
-            9.37541380598926e-06,
-            -0.000377732651131894,
-            0.00642826706073389,
-            -0.061281078712518,
-            0.390956214318641,
-            -0.0337884356755193,
-            0.00248824801827172,
-        ]
+        # val = (
+        #     coeffs[0] * q**6
+        #     + coeffs[1] * q**5
+        #     + coeffs[2] * q**4
+        #     + coeffs[3] * q**3
+        #     + coeffs[4] * q**2
+        #     + coeffs[5] * q**1
+        #     + coeffs[6] * q**0
+        # )
+        # return torch.exp(val)
 
-        val = (
-            coeffs[0] * q**6
-            + coeffs[1] * q**5
-            + coeffs[2] * q**4
-            + coeffs[3] * q**3
-            + coeffs[4] * q**2
-            + coeffs[5] * q**1
-            + coeffs[6] * q**0
+        jp = 0.25612601391340369863537463 * (
+            scipy.special.kv((q + 1) / 2, 0.25) + scipy.special.kv((q - 1) / 2, 0.25)
         )
-        return torch.exp(val)
+        return jp
 
     def prob(self, x):
         """Probability density function (pdf).
@@ -405,6 +407,7 @@ class Shash:
             The generated random variates.
 
         """
+        # xi=mu, eta=sigma, epsilon=gamma, delta=tau
         z = torch.tensor(scipy.stats.norm.rvs(size=size))
 
         if self.tau is None:
@@ -480,7 +483,9 @@ class Shash:
 
         """
 
-        raise Warning("This code is not correct.")
+        # raise Warning("This code is not correct.")
+        # xi=mu, eta=sigma, epsilon=gamma, delta=tau
+        # https://www.randomservices.org/random/expect/Skew.html
 
         evX = torch.sinh(self.gamma / self.tau) * self._jones_pewsey_P(1.0 / self.tau)
         evX2 = (
@@ -496,15 +501,9 @@ class Shash:
             * self._jones_pewsey_P(1.0 / self.tau)
         ) / 4.0
 
-        evY3 = (
-            torch.pow(self.mu, 3)
-            + 3.0 * torch.square(self.mu) * self.sigma * evX
-            + 3.0 * self.mu * torch.square(self.sigma) * evX2
-            + torch.pow(self.sigma, 3) * evX3
-        )
-        a_term = self.mu + self.sigma * evX
-        b_term = self.sigma * torch.sqrt(evX2 - evX * evX)
+        term_1 = evX3
+        term_2 = -3.0 * evX * evX2
+        term_3 = 2.0 * evX * evX * evX
+        denom = torch.pow(torch.sqrt(evX2 - evX * evX), 3)
 
-        return (
-            evY3 - 3.0 * a_term * torch.square(b_term) - torch.pow(a_term, 3)
-        ) / torch.pow(b_term, 3)
+        return (term_1 + term_2 + term_3) / denom
