@@ -1,7 +1,7 @@
 {
     "exp_name": "exp_test",
-    "device": "gpu",
-    "seed": 44,
+    "device": "cpu",
+    "seed": 22,
 
     "data_loader": {
         "data_dir": "data/",
@@ -12,13 +12,16 @@
     "arch": {
         "type": "cnn",
         "circular_padding": [5, 5, 0, 0],
+        "n_inputchannel": 1,
         "filters": [32, 32, 32],
         "kernel_size": [5, 3, 3],
         "cnn_act": ["ReLU", "ReLU", "ReLU"],
         "hiddens_block": [10, 10, 10],
+        "hiddens_block_in": [5761, 10, 10],
         "hiddens_block_act": ["ReLU", "ReLU", "ReLU"],
         "hiddens_final": 10,
-        "hiddens_final_act": "Tanh"
+        "hiddens_final_in": 11,
+        "hiddens_final_act": "ReLU"
     },
 
     "optimizer": {
@@ -37,11 +40,11 @@
     ],
 
     "trainer": {
-        "max_epochs": 15,
+        "max_epochs": 5,
         "save_dir": "saved_models/",
         "early_stopping":{
             "args":{
-                "patience": 2,
+                "patience": 10,
                 "min_delta": 0.0
             }
         }

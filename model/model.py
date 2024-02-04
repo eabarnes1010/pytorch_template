@@ -38,6 +38,13 @@ def dense_lazy_couplet(out_features, act_fun, *args, **kwargs):
     )
 
 
+def dense_couplet(in_features, out_features, act_fun, *args, **kwargs):
+    return torch.nn.Sequential(
+        torch.nn.Linear(in_features=in_features, out_features=out_features, bias=True),
+        getattr(torch.nn, act_fun)(),
+    )
+
+
 def conv_block(in_channels, out_channels, act_fun, kernel_size):
     block = [
         conv_couplet(in_channels, out_channels, act_fun, kernel_size, padding="same")
@@ -51,12 +58,21 @@ def conv_block(in_channels, out_channels, act_fun, kernel_size):
     return torch.nn.Sequential(*block)
 
 
-def dense_block(out_features, act_fun):
-    block = [
-        dense_lazy_couplet(out_channels, act_fun)
-        for out_channels, act_fun in zip([*out_features], [*act_fun])
-    ]
-    return torch.nn.Sequential(*block)
+def dense_block(out_features, act_fun, in_features=None):
+    if in_features is None:
+        block = [
+            dense_lazy_couplet(out_channels, act_fun)
+            for out_channels, act_fun in zip([*out_features], [*act_fun])
+        ]
+        return torch.nn.Sequential(*block)
+    else:
+        block = [
+            dense_couplet(in_features, out_features, act_fun)
+            for in_features, out_features, act_fun in zip(
+                [*in_features], [*out_features], [*act_fun]
+            )
+        ]
+        return torch.nn.Sequential(*block)
 
 
 class RescaleLayer:
@@ -76,8 +92,14 @@ class TorchModel(BaseModel):
 
         self.config = config
 
-        assert len(self.config["cnn_act"]) == len(self.config["kernel_size"]) == len(self.config["filters"])
-        assert len(self.config["hiddens_block"]) == len(self.config["hiddens_block_act"])
+        assert (
+            len(self.config["cnn_act"])
+            == len(self.config["kernel_size"])
+            == len(self.config["filters"])
+        )
+        assert len(self.config["hiddens_block"]) == len(
+            self.config["hiddens_block_act"]
+        )
 
         if target is None:
             self.target_mean = torch.tensor(0.0)
@@ -91,7 +113,7 @@ class TorchModel(BaseModel):
 
         # CNN block
         self.cnn_block = conv_block(
-            [1, *config["filters"][:-1]],
+            [config["n_inputchannel"], *config["filters"][:-1]],
             [*config["filters"]],
             [*config["cnn_act"]],
             [*config["kernel_size"]],
@@ -102,30 +124,46 @@ class TorchModel(BaseModel):
 
         # Dense blocks
         self.denseblock_mu = dense_block(
-            config["hiddens_block"], config["hiddens_block_act"]
+            config["hiddens_block"],
+            config["hiddens_block_act"],
+            in_features=config["hiddens_block_in"],
         )
         self.denseblock_sigma = dense_block(
-            config["hiddens_block"], config["hiddens_block_act"]
+            config["hiddens_block"],
+            config["hiddens_block_act"],
+            in_features=config["hiddens_block_in"],
         )
         self.denseblock_gamma = dense_block(
-            config["hiddens_block"], config["hiddens_block_act"]
+            config["hiddens_block"],
+            config["hiddens_block_act"],
+            in_features=config["hiddens_block_in"],
         )
         self.denseblock_tau = dense_block(
-            config["hiddens_block"], config["hiddens_block_act"]
+            config["hiddens_block"],
+            config["hiddens_block_act"],
+            in_features=config["hiddens_block_in"],
         )
 
         # Final dense layer
-        self.finaldense_mu = dense_lazy_couplet(
-            out_features=config["hiddens_final"], act_fun=config["hiddens_final_act"]
+        self.finaldense_mu = dense_couplet(
+            out_features=config["hiddens_final"],
+            act_fun=config["hiddens_final_act"],
+            in_features=config["hiddens_final_in"],
         )
-        self.finaldense_sigma = dense_lazy_couplet(
-            out_features=config["hiddens_final"], act_fun=config["hiddens_final_act"]
+        self.finaldense_sigma = dense_couplet(
+            out_features=config["hiddens_final"],
+            act_fun=config["hiddens_final_act"],
+            in_features=config["hiddens_final_in"],
         )
-        self.finaldense_gamma = dense_lazy_couplet(
-            out_features=config["hiddens_final"], act_fun=config["hiddens_final_act"]
+        self.finaldense_gamma = dense_couplet(
+            out_features=config["hiddens_final"],
+            act_fun=config["hiddens_final_act"],
+            in_features=config["hiddens_final_in"],
         )
-        self.finaldense_tau = dense_lazy_couplet(
-            out_features=config["hiddens_final"], act_fun=config["hiddens_final_act"]
+        self.finaldense_tau = dense_couplet(
+            out_features=config["hiddens_final"],
+            act_fun=config["hiddens_final_act"],
+            in_features=config["hiddens_final_in"],
         )
 
         # Rescaling layers
@@ -154,9 +192,9 @@ class TorchModel(BaseModel):
         x = self.flat(x)
 
         # build mu_layers
-        x_mu = torch.cat((x, x_unit[:, None]), dim=-1)
+        x_mu = torch.cat((x, x_unit[:, None]), dim=1)
         x_mu = self.denseblock_mu(x_mu)
-        x_mu = torch.cat((x_mu, x_unit[:, None]), dim=-1)
+        x_mu = torch.cat((x_mu, x_unit[:, None]), dim=1)
         x_mu = self.finaldense_mu(x_mu)
         mu_out = self.output_mu(x_mu)
 

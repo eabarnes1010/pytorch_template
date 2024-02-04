@@ -36,7 +36,7 @@ class BaseModel(torch.nn.Module):
         params = sum([np.prod(p.size()) for p in model_parameters])
         return (
             super().__str__()
-            + "\nTrainable parameters (may be incorrect): {}".format(params)
+            + "\nTrainable parameters: {}".format(params)
         )
 
     def freeze_layers(self, freeze_id, verbose=False):
@@ -50,8 +50,9 @@ class BaseModel(torch.nn.Module):
                 param.requires_grad = True
 
         if verbose:
-            for name, para in self.named_parameters():
+            for name, param in self.named_parameters():
                 print("-" * 20)
-                print(f"name: {name}")
-                print("values: ")
-                print(para.requires_grad)
+                print(f"name: {name}, ")
+                print(str(param.numel()))
+                print(", train: ")
+                print(param.requires_grad)
