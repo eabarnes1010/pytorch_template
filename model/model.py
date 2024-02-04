@@ -192,9 +192,9 @@ class TorchModel(BaseModel):
         x = self.flat(x)
 
         # build mu_layers
-        x_mu = torch.cat((x, x_unit[:, None]), dim=1)
+        x_mu = torch.cat((x, x_unit[:, None]), dim=-1)
         x_mu = self.denseblock_mu(x_mu)
-        x_mu = torch.cat((x_mu, x_unit[:, None]), dim=1)
+        x_mu = torch.cat((x_mu, x_unit[:, None]), dim=-1)
         x_mu = self.finaldense_mu(x_mu)
         mu_out = self.output_mu(x_mu)
 
@@ -221,10 +221,8 @@ class TorchModel(BaseModel):
 
         # rescaling layers
         mu_out = self.rescale_mu(mu_out)
-
         sigma_out = self.rescale_sigma(sigma_out)
         sigma_out = torch.exp(sigma_out)
-
         tau_out = self.rescale_tau(tau_out)
 
         # final output, concatenate parameters together
