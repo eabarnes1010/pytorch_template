@@ -112,7 +112,7 @@ class TorchModel(BaseModel):
         self.pad_lons = torch.nn.CircularPad2d(config["circular_padding"])
 
         # CNN block
-        self.cnn_block = conv_block(
+        self.conv_block = conv_block(
             [config["n_inputchannel"], *config["filters"][:-1]],
             [*config["filters"]],
             [*config["cnn_act"]],
@@ -188,7 +188,7 @@ class TorchModel(BaseModel):
     def forward(self, x, x_unit):
 
         x = self.pad_lons(x)
-        x = self.cnn_block(x)
+        x = self.conv_block(x)
         x = self.flat(x)
 
         # build mu_layers
