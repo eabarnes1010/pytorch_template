@@ -16,9 +16,8 @@ TorchModel(base.base_model.BaseModel)
 """
 
 import torch
+import numpy as np
 from base.base_model import BaseModel
-import matplotlib.pyplot as plt
-
 
 # https://github.com/FrancescoSaverioZuppichini/Pytorch-how-and-when-to-use-Module-Sequential-ModuleList-and-ModuleDict
 
@@ -229,3 +228,39 @@ class TorchModel(BaseModel):
         x = torch.cat((mu_out, sigma_out, gamma_out, tau_out), dim=-1)
 
         return x
+
+    def predict(self, dataset=None, dataloader=None, batch_size=128, device="cpu"):
+
+        if (dataset is None) & (dataloader is None):
+            raise ValueError("both dataset and dataloader cannot be done.")
+
+        if (dataset is not None) & (dataloader is not None):
+            raise ValueError("dataset and dataloader cannot both be defined. choose one.")
+
+        if dataset is not None:
+            dataloader = torch.utils.data.DataLoader(
+                dataset,
+                batch_size=batch_size,
+                shuffle=False,
+                drop_last=False,
+            )
+
+        self.to(device)
+        self.eval()
+        with torch.inference_mode():
+
+            output = None
+            for batch_idx, (data, target) in enumerate(dataloader):
+                input, input_unit, target = (
+                    data[0].to(device),
+                    data[1].to(device),
+                    target.to(device),
+                )
+
+                out = self(input, input_unit).to("cpu").numpy()
+                if output is None:
+                    output = out
+                else:
+                    output = np.concatenate((output, out), axis=0)
+
+        return output
