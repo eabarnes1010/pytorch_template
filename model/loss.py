@@ -31,7 +31,7 @@ class ShashNLL(torch.nn.Module):
         # to prevent huge initial losses and improve stability
         # loss = -torch.log(dist.prob(target + self.epsilon))
 
-        return loss.mean(dim=-1)
+        return loss.mean()
 
 
 class GaussianNLL(torch.nn.Module):
@@ -56,4 +56,4 @@ class GaussianNLL(torch.nn.Module):
         #     + self.epsilon
         # )
 
-        return loss.mean(dim=-1)
+        return loss.mean()
