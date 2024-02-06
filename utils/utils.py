@@ -80,3 +80,10 @@ class MetricTracker:
     def result(self):
         for key in self.history:
             self.history[key] = np.nanmean(self.history[key])
+
+    def print(self, idx=None):
+        for key in self.history.keys():
+            if idx is None:
+                print(f"  {key} = {self.history[key]:.5f}")
+            else:
+                print(f"  {key} = {self.history[key][idx]:.5f}")
