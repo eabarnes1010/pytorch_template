@@ -86,7 +86,7 @@ class RescaleLayer:
 
 
 class TorchModel(BaseModel):
-    def __init__(self, config, target=None):
+    def __init__(self, config, target_mean=None, target_std=None):
         super().__init__()
 
         self.config = config
@@ -100,12 +100,15 @@ class TorchModel(BaseModel):
             self.config["hiddens_block_act"]
         )
 
-        if target is None:
+        if target_mean is None:
             self.target_mean = torch.tensor(0.0)
+        else:
+            self.target_mean = torch.tensor(target_mean)
+
+        if target_std is None:
             self.target_std = torch.tensor(1.0)
         else:
-            self.target_mean = torch.tensor(target.mean(axis=0))
-            self.target_std = torch.tensor(target.std(axis=0))
+            self.target_std = torch.tensor(target_std)
 
         # Longitude padding
         self.pad_lons = torch.nn.CircularPad2d(config["circular_padding"])
